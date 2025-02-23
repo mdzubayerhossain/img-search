@@ -1,0 +1,51 @@
+def prepare_data(self, poster_dir, non_poster_dir):
+    """Prepare dataset with heavy augmentation for small datasets"""
+    # Load original images
+    poster_images, _ = self.load_images(poster_dir)
+    non_poster_images, _ = self.load_images(non_poster_dir)
+    
+    # Create augmentation pipeline for training data
+    augmentation = tf.keras.Sequential([
+        layers.RandomFlip("horizontal"),
+        layers.RandomFlip("vertical"),
+        layers.RandomRotation(0.2),
+        layers.RandomZoom(0.2),
+        layers.RandomBrightness(0.4),
+        layers.RandomContrast(0.4),
+    ])
+    
+    # Generate augmented images
+    def augment_images(images, num_augmented=5):
+        augmented = []
+        for img in images:
+            augmented.append(img)  # Original image
+            for _ in range(num_augmented):
+                aug_img = augmentation(tf.convert_to_tensor(img[None, ...]))
+                augmented.append(aug_img[0])
+        return np.array(augmented)
+    
+    # Augment both classes
+    poster_images_aug = augment_images(poster_images)
+    non_poster_images_aug = augment_images(non_poster_images)
+    
+    # Combine datasets
+    X = np.concatenate([poster_images_aug, non_poster_images_aug])
+    y = np.concatenate([
+        np.ones(len(poster_images_aug)),
+        np.zeros(len(non_poster_images_aug))
+    ])
+    
+    # Print dataset statistics
+    print("\nDataset Statistics:")
+    print(f"Original poster images: {len(poster_images)}")
+    print(f"Augmented poster images: {len(poster_images_aug)}")
+    print(f"Original non-poster images: {len(non_poster_images)}")
+    print(f"Augmented non-poster images: {len(non_poster_images_aug)}")
+    print(f"Total training images: {len(X)}")
+    
+    # Split with stratification
+    X_train, X_val, y_train, y_val = train_test_split(
+        X, y, test_size=0.2, random_state=42, stratify=y
+    )
+    
+    return (X_train, y_train), (X_val, y_val)
